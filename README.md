@@ -7,31 +7,46 @@ Hệ thống quản lý nhân sự đầy đủ với 2 module chính: **Quản 
 | Layer    | Công nghệ |
 |----------|-----------|
 | Frontend | React 18, TypeScript, Vite, React Query, Zustand, React Hook Form, React Router v6 |
-| Backend  | Node.js, Express, TypeScript, PostgreSQL, JWT, Zod |
-| Database | PostgreSQL 16 |
+| Backend  | Node.js, Express, TypeScript, **MySQL** (Aiven), JWT, Zod |
+| Database | MySQL 8.0 (hosted trên Aiven Cloud) |
 | DevOps   | Docker, Docker Compose |
 
 ## Cấu trúc dự án
 
 ```
 hrm-system/
-├── frontend/          # React + TypeScript + Vite
+├── frontend/                  # React + TypeScript + Vite
 │   └── src/
-│       ├── components/   # UI components tái sử dụng
-│       ├── pages/        # Route pages
-│       ├── hooks/        # React Query hooks
-│       ├── services/     # API calls (axios)
-│       ├── store/        # Zustand global state
-│       ├── types/        # TypeScript types
-│       └── utils/        # Helpers
-├── backend/           # Node.js + Express + TypeScript
+│       ├── components/
+│       │   ├── common/        # Badge, Button, Modal, Avatar, StatCard...
+│       │   ├── layout/        # MainLayout, PageShell, Sidebar
+│       │   ├── employees/     # EmployeeForm, EmployeeDetailPanel
+│       │   └── recruitment/   # CandidateForm, JobForm
+│       ├── pages/
+│       │   ├── employees/     # EmployeeListPage, DepartmentPage, AttendancePage
+│       │   └── recruitment/   # PipelinePage, JobListPage, CandidateListPage
+│       ├── hooks/             # React Query hooks (useEmployees, useCandidates...)
+│       ├── services/          # API calls (axios)
+│       ├── store/             # Zustand (authStore)
+│       ├── types/             # TypeScript interfaces
+│       └── utils/             # Helpers (formatDate, formatCurrency...)
+│
+├── backend/                   # Node.js + Express + TypeScript
 │   └── src/
-│       ├── modules/      # employees / departments / recruitment / auth
-│       ├── config/       # database, env
-│       ├── middleware/   # auth, validate, error handler
-│       ├── database/     # migrations, seeds
-│       └── utils/        # ApiResponse, pagination
-└── docker-compose.yml
+│       ├── modules/
+│       │   ├── employees/     # controller, service, repository, routes
+│       │   ├── departments/   # controller, service, repository, routes
+│       │   ├── recruitment/   # job + candidate (controller, service, repository, routes)
+│       │   └── auth/          # login, profile, change-password
+│       ├── config/            # database.ts (MySQL pool), env.ts, cors.ts
+│       ├── middleware/        # auth (JWT), validate (Zod), error handler
+│       ├── database/
+│       │   ├── migrations/    # schema.sql
+│       │   └── seeds/         # seed.ts (dữ liệu mẫu)
+│       └── utils/             # ApiResponse, pagination
+│
+├── docker-compose.yml
+└── README.md
 ```
 
 ## REST API
@@ -64,7 +79,7 @@ hrm-system/
 ### Tuyển dụng — Vị trí
 | Method | Endpoint | Mô tả |
 |--------|----------|-------|
-| GET    | /api/recruitment/jobs | Danh sách vị trí tuyển dụng |
+| GET    | /api/recruitment/jobs | Danh sách vị trí |
 | POST   | /api/recruitment/jobs | Đăng vị trí mới |
 | PUT    | /api/recruitment/jobs/:id | Cập nhật / đóng vị trí |
 | DELETE | /api/recruitment/jobs/:id | Xóa vị trí |
@@ -82,39 +97,57 @@ hrm-system/
 
 ## Cài đặt & Chạy
 
-### Cách 1: Docker (khuyến nghị)
-```bash
-git clone <repo>
-cd hrm-system
-docker-compose up -d
+### Yêu cầu
+- Node.js 18+
+- Tài khoản [Aiven](https://aiven.io) với MySQL service (hoặc MySQL local)
 
-# Chạy migration & seed
-docker exec hrm_backend npm run migrate
-docker exec hrm_backend npm run seed
+### Bước 1 — Cấu hình môi trường
+
+File `.env` đã được cấu hình sẵn trong `backend/.env`. Nếu cần thay đổi, chỉnh sửa các biến:
+
+```env
+DB_HOST=mysql-xxxx.aivencloud.com
+DB_PORT=14833
+DB_NAME=defaultdb
+DB_USER=avnadmin
+DB_PASSWORD=your_password
+DB_SSL=true
+
+JWT_SECRET=your_jwt_secret
+CORS_ORIGIN=http://localhost:5173
 ```
-Truy cập: http://localhost:5173
 
-### Cách 2: Chạy trực tiếp
+### Bước 2 — Chạy Backend
 
-**Yêu cầu:** Node.js 18+, PostgreSQL 14+
-
-```bash
-# 1. Tạo database PostgreSQL
-createdb hrm_db
-
-# 2. Backend
+```cmd
 cd backend
-cp .env.example .env     # Điền thông tin DB vào .env
 npm install
-npm run migrate          # Tạo bảng
-npm run seed             # Dữ liệu mẫu
-npm run dev              # Chạy tại port 5000
+npm run migrate    # Tạo bảng trong database
+npm run seed       # Nhập dữ liệu mẫu
+npm run dev        # Chạy tại http://localhost:5000
+```
 
-# 3. Frontend (terminal mới)
+Kiểm tra kết nối: http://localhost:5000/health
+
+### Bước 3 — Chạy Frontend
+
+Mở terminal mới:
+
+```cmd
 cd frontend
 npm install
-npm run dev              # Chạy tại port 5173
+npm run dev        # Chạy tại http://localhost:5173
 ```
+
+### Lưu ý Windows
+
+Nếu gặp lỗi `cannot be loaded because running scripts is disabled`:
+
+```powershell
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+```
+
+Hoặc dùng `cmd.exe` thay vì PowerShell.
 
 ## Tài khoản demo
 
@@ -125,25 +158,26 @@ npm run dev              # Chạy tại port 5173
 
 ## Tính năng
 
-### Module 1: Quản lý hồ sơ nhân viên
-- ✅ Danh sách nhân viên với filter đa chiều (phòng ban, trạng thái, hợp đồng)
-- ✅ Tìm kiếm fulltext
-- ✅ Thêm / sửa / xóa nhân viên
-- ✅ Phân trang server-side
-- ✅ Quản lý phòng ban (CRUD)
-- ✅ Dashboard thống kê
-- ✅ Chấm công (demo)
+### Module 1 — Quản lý hồ sơ nhân viên
+- Danh sách nhân viên với filter đa chiều (phòng ban, trạng thái, loại hợp đồng)
+- Tìm kiếm fulltext theo tên, email, mã nhân viên
+- Thêm / sửa / xóa nhân viên với form validation
+- Xem chi tiết nhân viên qua slide-in panel
+- Phân trang server-side
+- Quản lý phòng ban (CRUD)
+- Trang chấm công
 
-### Module 2: Quản lý tuyển dụng
-- ✅ Kanban pipeline 4 giai đoạn: Đã nộp → Sàng lọc → Phỏng vấn → Đề xuất
-- ✅ Chuyển giai đoạn ứng viên bằng 1 click
-- ✅ Quản lý vị trí tuyển dụng (đăng mới, đóng/mở)
-- ✅ Danh sách ứng viên với filter
-- ✅ Thống kê pipeline realtime
+### Module 2 — Quản lý tuyển dụng
+- Kanban pipeline 4 giai đoạn: Đã nộp → Sàng lọc → Phỏng vấn → Đề xuất
+- Chuyển giai đoạn ứng viên bằng 1 click
+- Quản lý vị trí tuyển dụng: đăng mới, đóng/mở, progress bar chỉ tiêu
+- Danh sách ứng viên với filter theo giai đoạn và vị trí
+- Thống kê pipeline realtime trên Dashboard
 
 ### Bảo mật
-- ✅ JWT Authentication
-- ✅ RBAC (admin, hr, manager)
-- ✅ Zod schema validation
-- ✅ Helmet security headers
-- ✅ CORS configuration
+- JWT Authentication (7 ngày)
+- RBAC: admin / hr / manager
+- Zod schema validation toàn bộ API
+- Helmet security headers
+- CORS có cấu hình whitelist
+- SSL bắt buộc với Aiven MySQL
